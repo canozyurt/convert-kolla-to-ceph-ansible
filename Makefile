@@ -7,6 +7,7 @@ APT_PACKAGES := \
 	docker.io \
 	docker-compose \
 	qemu-kvm \
+	qemu-utils \
 	libvirt-bin \
 	python-virtualenv \
 	python-dev \
