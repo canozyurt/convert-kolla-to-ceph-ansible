@@ -1,0 +1,7 @@
+[submodule "ceph-ansible"]
+	path = ceph-ansible
+	url = https://github.com/ceph/ceph-ansible.git
+	branch = stable-4.0
+[submodule "kolla-ansible"]
+	path = kolla-ansible
+	url = https://github.com/openstack/kolla-ansible.git

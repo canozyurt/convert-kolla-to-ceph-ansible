@@ -1,0 +1,248 @@
+- hosts:
+  - control
+  - storage
+  become: True
+  vars:
+    fetch_directory: "fetch/"
+  tasks:
+
+    - name: check if fsid set at all
+      assert:
+        that:
+        - generate_fsid is false
+
+    - import_role:
+        name: ceph-defaults
+
+    - name: lookup keys in /etc/kolla/ceph*
+      shell: find /etc/kolla/ceph* -iname *.keyring
+      changed_when: false
+      register: ceph_keys
+
+    - name: create a local fetch directory if it does not exist
+      file:
+        path: "{{ fetch_directory }}"
+        state: directory
+      delegate_to: localhost
+      become: false
+
+    - name: "copy ceph user and bootstrap keys to the ansible server in {{ fetch_directory }}/"
+      fetch:
+        flat: yes
+        src: "{{ item }}"
+        dest: "{{ fetch_directory }}/{{ inventory_hostname }}/"
+      with_items:
+        - "{{ ceph_keys.stdout_lines }}"
+
+    - name: copy ceph related files from /etc/kolla/ to /etc/ceph/
+      copy:
+        remote_src: yes
+        src : "{{ item }}"
+        dest: /etc/ceph/
+        owner: "{{ ceph_uid }}"
+        group: "{{ ceph_uid }}"
+      with_items:
+        - "{{ ceph_keys.stdout_lines }}"
+
+    - name: copy ceph.client.mon.keyring as ceph.mon.keyring
+      copy:
+        remote_src: yes
+        src: /etc/ceph/ceph.client.mon.keyring
+        dest: /etc/ceph/ceph.mon.keyring
+        owner: "{{ ceph_uid }}"
+        group: "{{ ceph_uid }}"
+      when: "'control' in group_names"
+
+
+- hosts:
+  - mons
+  - osds
+  - mdss
+  - rgws
+  - nfss
+  - rbdmirrors
+  - clients
+  - mgrs
+  - iscsi-gw
+  become: true
+  vars:
+    cluster_name: "ceph"
+  tasks:
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - name: create ceph initial directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ceph_uid }}"
+        group: "{{ ceph_uid }}"
+        mode: 0755
+      loop:
+        - /etc/ceph
+        - /var/lib/ceph/
+        - /var/lib/ceph/mon
+        - /var/lib/ceph/osd
+        - /var/lib/ceph/mds
+        - /var/lib/ceph/tmp
+        - /var/lib/ceph/radosgw
+        - /var/lib/ceph/bootstrap-rgw
+        - /var/lib/ceph/bootstrap-mgr
+        - /var/lib/ceph/bootstrap-mds
+        - /var/lib/ceph/bootstrap-osd
+        - /var/lib/ceph/bootstrap-rbd
+        - /var/lib/ceph/bootstrap-rbd-mirror
+        - /var/run/ceph
+        - /var/log/ceph
+
+  post_tasks:
+
+    - name: generate ceph configuration file
+      action: config_template
+      args:
+        src: "roles/ceph-config/templates/ceph.conf.j2"
+        dest: "/etc/ceph/{{ cluster_name }}.conf"
+        owner: "{{ ceph_uid if containerized_deployment | bool else 'ceph' }}"
+        group: "{{ ceph_uid if containerized_deployment | bool else 'ceph' }}"
+        mode: "0644"
+        config_overrides: "{{ ceph_conf_overrides }}"
+        config_type: ini
+
+
+- name: switching from kolla containers to containerized ceph mon
+  vars:
+    containerized_deployment: true
+    switch_to_containers: True
+    mon_group_name:       mons
+  hosts: "{{ mon_group_name|default('mons') }}"
+  serial: 1
+  become: true
+
+  pre_tasks:
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - name: Stop Kolla container
+      kolla_docker:
+        name: ceph_mon
+        action: stop_and_remove_container
+
+  tasks:
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - import_role:
+        name: ceph-mon
+
+  post_tasks:
+    - name: waiting for the monitor to join the quorum...
+      command: "{{ container_binary }} run --rm  -v /etc/ceph:/etc/ceph:z --entrypoint=ceph {{ ceph_docker_registry }}/{{ ceph_docker_image }}:{{ ceph_docker_image_tag }} --cluster {{ cluster }} quorum_status --format json"
+      register: ceph_health_raw
+      changed_when: false
+      until: ansible_facts['hostname'] in (ceph_health_raw.stdout | trim | from_json)["quorum_names"]
+      retries: "{{ health_mon_check_retries }}"
+      delay: "{{ health_mon_check_delay }}"
+
+
+- name: switching from kolla containers to containerized ceph mgr
+
+  hosts: "{{ mgr_group_name|default('mgrs') }}"
+
+  vars:
+    containerized_deployment: true
+    mgr_group_name: mgrs
+
+  serial: 1
+  become: true
+
+  pre_tasks:
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - name: set proper ownership on ceph directories
+      command: "find /var/lib/ceph/mgr /etc/ceph -not -( -user {{ ceph_uid }} -or -group {{ ceph_uid }} -) -execdir chown -h {{ ceph_uid }}:{{ ceph_uid }} {} +"
+      changed_when: false
+
+    - name: Stop Kolla container
+      kolla_docker:
+        name: ceph_mgr
+        action: stop_and_remove_container
+
+  tasks:
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - import_role:
+        name: ceph-mgr
+
+- name: switching from kolla container to containerized ceph mds
+
+  hosts: "{{ mds_group_name|default('mdss') }}"
+
+  vars:
+    containerized_deployment: true
+    mds_group_name: mdss
+
+  serial: 1
+  become: true
+  pre_tasks:
+
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - name: "copy ceph.mds.{{ inventory_hostname }}.keyring as /var/lib/ceph/mds/{{ inventory_hostname }}/keyring"
+      copy:
+        remote_src: yes
+        src: "/etc/ceph/ceph.mds.{{ inventory_hostname }}.keyring"
+        dest: "/var/lib/ceph/mds/ceph-{{ inventory_hostname }}/keyring"
+        owner: "{{ ceph_uid }}"
+        group: "{{ ceph_uid }}"
+      when: "'control' in group_names"
+
+    - name: set proper ownership on ceph directories
+      command: "find /var/lib/ceph/mds /etc/ceph -not -( -user {{ ceph_uid }} -or -group {{ ceph_uid }} -) -execdir chown {{ ceph_uid }}:{{ ceph_uid }} {} +"
+      changed_when: false
+
+    - name: Stop Kolla container
+      kolla_docker:
+        name: ceph_mds
+        action: stop_and_remove_container
+
+  tasks:
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - import_role:
+         name: ceph-mds
+
+

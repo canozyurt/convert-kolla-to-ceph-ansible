@@ -1,0 +1,27 @@
+containerized_deployment: true
+public_network: "192.168.129.0/24"
+cluster_network: "192.168.130.0/24"
+osd_auto_discovery: true
+
+monitor_interface: "eth4"
+radosgw_interface: "eth4"
+
+container_package_name: "docker-ce"
+container_service_name: "docker"
+container_binding_name: "python3-docker"
+
+ntp_service_enabled: false
+
+dashboard_admin_password: "password"
+grafana_admin_password: "password"
+
+yes_i_know: True
+
+ceph_conf_overrides:
+  global:
+    "mon max pg per osd": 1000
+    "osd max pg per osd hard ratio": 10
+    "osd crush update on start": true
+
+generate_fsid: false
+fsid: "f190e9d8-ebc1-431c-bc4c-361f998b181e"

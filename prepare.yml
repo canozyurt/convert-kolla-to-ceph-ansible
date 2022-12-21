@@ -1,0 +1,45 @@
+# vim: set shiftwidth=2 tabstop=2 softtabstop=-1 expandtab:
+---
+- name: Configure hosts
+  hosts: all
+
+  tasks:
+  ## generic/ubuntu1804 box comes with ipv6 disabled. RabbitMQ doesn't like that. Also /etc/hosts cleaning.
+  - name: "Delete some strings"
+    become: yes
+    tags: clean
+    lineinfile:
+      path: "{{ item.file }}"
+      regex: "{{ item.string }}"
+      state: absent
+    with_items:
+    - file: /etc/hosts
+      string: "^127.*{{ ansible_hostname }}"
+    - file: /etc/modprobe.d/local.conf
+      string: ".*disable_ipv6.*"
+    - file: /etc/sysctl.conf
+      string: ".*disable_ipv6.*"
+
+- name: "Prepare disks for Ceph"
+  hosts: storage
+  
+  tasks:
+  - become: yes
+    parted:
+      name: "KOLLA_CEPH_OSD_BOOTSTRAP_BS"
+      device: "/dev/{{item}}"
+      label: gpt
+      number: 1
+      state: present
+    with_items:
+      - vdb
+      - vdc
+      - vdd
+
+- name: "Reboot all"
+  hosts: "!localhost"
+  tasks:
+  - reboot:
+    become: yes
+
+

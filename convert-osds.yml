@@ -1,0 +1,119 @@
+- hosts:
+  - mons
+  - osds
+  - mdss
+  - rgws
+  - nfss
+  - rbdmirrors
+  - clients
+  - mgrs
+  - iscsi-gw
+  become: true
+  vars:
+    cluster_name: "ceph"
+  tasks:
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+- name: switching from kolla containers to containerized ceph osd
+
+  vars:
+    containerized_deployment: true
+    osd_group_name: osds
+    switch_to_containers: True
+
+  hosts: storage
+
+  serial: 1
+  become: true
+  tags: osd
+  pre_tasks:
+
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - name: get osd directories
+      command: >
+        find /var/lib/ceph/osd -maxdepth 1 -mindepth 1 -type d -name *-*-*-*-*
+      register: osd_dirs
+      changed_when: false
+      failed_when: false
+
+    - block:
+      - name: register whoamis
+        command: >
+          cat {{ item }}/whoami
+        register: uuid_osdid
+        with_items: "{{ osd_dirs.stdout_lines }}"
+
+      - name: stop kolla osd containers
+        kolla_docker:
+          name: "ceph_osd_{{ item.stdout }}"
+          action: stop_container
+        with_items: "{{ uuid_osdid.results }}"
+
+      - name: create new osd directories
+        file:
+          path: "/var/lib/ceph/osd/ceph-{{ item.stdout }}"
+          state: directory
+          owner: "{{ ceph_uid }}"
+          group: "{{ ceph_uid }}"
+          mode: 0755
+        with_items: "{{ uuid_osdid.results }}"
+
+      - name: umount osd dirs
+        command: >
+          umount {{ item }}
+        with_items: "{{ osd_dirs.stdout_lines }}"
+
+      - name: Replace mount points in fstab
+        ansible.builtin.replace:
+          path: /etc/fstab
+          regexp: "{{ item.item }}"
+          replace: "/var/lib/ceph/osd/ceph-{{ item.stdout }}"
+        with_items: "{{ uuid_osdid.results }}"
+
+      - name: delete old osd directories
+        file:
+          path: "{{ item }}"
+          state: absent
+        with_items: "{{ osd_dirs.stdout_lines }}"
+
+      - name: mount all
+        command: mount -a
+
+      - name: run ceph-volume simple scan
+        command: "{{ container_binary }} run --rm --net=host --privileged=true -v /var/run/udev/:/var/run/udev/:z -v /run/lvm/:/run/lvm/ -v /etc/ceph:/etc/ceph:z -v /dev:/dev -v /var/lib/ceph/:/var/lib/ceph/ --entrypoint=ceph-volume {{ ceph_docker_registry }}/{{ ceph_docker_image }}:{{ ceph_docker_image_tag }} simple scan /var/lib/ceph/osd/ceph-{{ item.stdout }}"
+        with_items: "{{ uuid_osdid.results }}"
+      when: osd_dirs | length > 0
+
+  tasks:
+
+    - import_role:
+        name: ceph-osd
+
+  post_tasks:
+    - name: container - waiting for clean pgs...
+      command: >
+        {{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} pg stat --format json
+      register: ceph_health_post
+      until: >
+        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | length) > 0)
+        and
+        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | selectattr('name', 'search', '^active\\+clean') | map(attribute='num') | list | sum) == (ceph_health_post.stdout | from_json).pg_summary.num_pgs)
+      delegate_to: "{{ groups[mon_group_name][0] }}"
+      retries: "{{ health_osd_check_retries }}"
+      delay: "{{ health_osd_check_delay }}"
+      changed_when: false
