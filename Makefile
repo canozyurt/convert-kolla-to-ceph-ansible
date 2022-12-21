@@ -14,7 +14,8 @@ APT_PACKAGES := \
 	gcc \
 	libssl-dev \
 	python-selinux \
-	python-setuptools
+	python-setuptools \
+	vagrant-libvirt
 
 define KOLLA_ANSIBLE_CMDS
 	bootstrap-servers \
@@ -31,7 +32,7 @@ $(VENV):
 	$(PIP) install -U pip
 	$(PIP) install -U setuptools
 
-prepare: install-dependencies registry
+prepare: registry
 	$(BIN)/ansible-playbook -i inventory/ prepare.yml
 
 $(KOLLA_ANSIBLE_CMDS): kolla-ansible/tools/kolla-ansible
@@ -41,9 +42,10 @@ convert convert-osds: ceph-ansible/library/kolla_docker.py roles
 	$(CEPH_ANSIBLE_ENVS) $(BIN)/ansible-playbook -i inventory/ $@.yml
 
 
-install-dependencies: install-apt-packages $(VENV) install-pip-packages $(BIN)/kolla-ansible
+install-dependencies: install-apt-packages $(VENV) install-pip-packages
 
 install-apt-packages:
+	sudo apt update
 	sudo DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y $(APT_PACKAGES)
 
 install-pip-packages: kolla-ansible/requirements.txt ceph-ansible/requirements.txt
