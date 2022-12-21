@@ -1,4 +1,4 @@
-VENV := .venv
+VENV := ${PWD}/.venv
 BIN := $(VENV)/bin
 PYTHON := $(BIN)/python
 PIP := $(BIN)/pip
@@ -7,7 +7,6 @@ APT_PACKAGES := \
 	docker.io \
 	docker-compose \
 	qemu-kvm \
-	qemu-utils \
 	libvirt-bin \
 	python-virtualenv \
 	python-dev \
@@ -33,10 +32,10 @@ $(VENV):
 	$(PIP) install -U pip
 	$(PIP) install -U setuptools
 
-prepare: registry
+prepare: install-dependencies registry
 	$(BIN)/ansible-playbook -i inventory/ prepare.yml
 
-$(KOLLA_ANSIBLE_CMDS): kolla-ansible/tools/kolla-ansible
+$(KOLLA_ANSIBLE_CMDS): kolla-ansible/tools/kolla-ansible $(BIN)/kolla-ansible
 	PATH="$(BIN):${PATH}" kolla-ansible/tools/kolla-ansible --configdir ${PWD}/group_vars -i inventory/ $@
 
 convert convert-osds: ceph-ansible/library/kolla_docker.py roles
@@ -46,7 +45,6 @@ convert convert-osds: ceph-ansible/library/kolla_docker.py roles
 install-dependencies: install-apt-packages $(VENV) install-pip-packages
 
 install-apt-packages:
-	sudo apt update
 	sudo DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y $(APT_PACKAGES)
 
 install-pip-packages: kolla-ansible/requirements.txt ceph-ansible/requirements.txt
@@ -59,4 +57,7 @@ ceph-ansible/library/kolla_docker.py: kolla-ansible/ansible/library/kolla_docker
 	cp $^ $@
 
 roles: ceph-ansible/roles
-	ln -s $^	
+	ln -s $^
+
+$(BIN)/kolla-ansible: kolla-ansible/setup.cfg kolla-ansible/setup.py
+	cd kolla-ansible; $(PYTHON) setup.py install
