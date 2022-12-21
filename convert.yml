@@ -245,4 +245,42 @@
     - import_role:
          name: ceph-mds
 
+- name: switching from kolla container to containerized ceph nfs
 
+  hosts: "{{ nfs_group_name|default('nfss') }}"
+
+  vars:
+    containerized_deployment: true
+    nfs_group_name: nfss
+
+  serial: 1
+  become: true
+  pre_tasks:
+
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - name: set proper ownership on ceph directories
+      command: "find /var/lib/ceph /etc/ceph -not -( -user {{ ceph_uid }} -or -group {{ ceph_uid }} -) -execdir chown {{ ceph_uid }}:{{ ceph_uid }} {} +"
+      changed_when: false
+
+    - name: Stop Kolla container
+      kolla_docker:
+        name: ceph_nfs
+        action: stop_and_remove_container
+
+  tasks:
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - import_role:
+        name: ceph-nfs
