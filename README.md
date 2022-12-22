@@ -21,6 +21,7 @@ Deploying Openstack
  # sudo apt install make -y
  # cd ./convert-kolla-to-ceph-ansible
  # make install-dependencies
+ # vagrant up
  # make
 ```
 
