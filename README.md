@@ -16,10 +16,10 @@ Tested on Ubuntu 18.04. Vagrant deploys generic/ubuntu1804 boxes.
 Deploying Openstack
 
 ```bash
- # git clone https://github.com/canozyurt/convert-kolla-to-ceph-ansible --recursive
+ # git clone https://github.com/canozyurt/migrate-kolla-to-ceph-ansible --recursive
  # sudo apt update
  # sudo apt install make -y
- # cd ./convert-kolla-to-ceph-ansible
+ # cd ./migrate-kolla-to-ceph-ansible
  # make install-dependencies
  # vagrant up
  # make
@@ -28,8 +28,8 @@ Deploying Openstack
 Convert to ceph-ansible
 
 ```bash
- # make convert
- # make convert-osds
+ # make migrate
+ # make migrate-osds
 ```
 
-Above commands run convert.yml and conver.osds.yml playbooks respectively.
+Above commands run migrate.yml and migrate-osds.yml playbooks respectively.

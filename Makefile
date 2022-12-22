@@ -39,7 +39,7 @@ prepare: install-dependencies registry
 $(KOLLA_ANSIBLE_CMDS): kolla-ansible/tools/kolla-ansible $(BIN)/kolla-ansible
 	PATH="$(BIN):${PATH}" kolla-ansible/tools/kolla-ansible --configdir ${PWD}/group_vars -i inventory/ $@
 
-convert convert-osds: ceph-ansible/library/kolla_docker.py roles
+migrate migrate-osds: ceph-ansible/library/kolla_docker.py roles
 	$(CEPH_ANSIBLE_ENVS) $(BIN)/ansible-playbook -i inventory/ $@.yml
 
 
