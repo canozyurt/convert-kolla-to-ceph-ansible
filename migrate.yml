@@ -284,3 +284,47 @@
 
     - import_role:
         name: ceph-nfs
+
+- name: switching from kolla container to containerized ceph rgw
+
+  hosts: "{{ nfs_group_name|default('rgws') }}"
+
+  vars:
+    containerized_deployment: true
+    rgw_group_name: rgws
+
+  serial: 1
+  become: true
+  pre_tasks:
+
+    - import_role:
+        name: ceph-defaults
+
+    - import_role:
+        name: ceph-facts
+
+    - import_role:
+        name: ceph-config
+        tasks_from: rgw_systemd_environment_file.yml
+
+    - name: set proper ownership on ceph directories
+      command: "find /var/lib/ceph /etc/ceph -not -( -user {{ ceph_uid }} -or -group {{ ceph_uid }} -) -execdir chown {{ ceph_uid }}:{{ ceph_uid }} {} +"
+      changed_when: false
+
+    - name: Stop Kolla container
+      kolla_docker:
+        name: ceph_rgw
+        action: stop_and_remove_container
+
+  tasks:
+    - import_role:
+        name: ceph-handler
+
+    - import_role:
+        name: ceph-container-engine
+
+    - import_role:
+        name: ceph-container-common
+
+    - import_role:
+        name: ceph-rgw

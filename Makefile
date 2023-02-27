@@ -21,7 +21,9 @@ APT_PACKAGES := \
 define KOLLA_ANSIBLE_CMDS
 	bootstrap-servers \
 	prechecks \
-	deploy
+	deploy \
+	post-deploy \
+	pull
 endef
 
 CEPH_ANSIBLE_ENVS := ANSIBLE_LIBRARY=${PWD}/ceph-ansible/library ANSIBLE_ACTION_PLUGINS=${PWD}/ceph-ansible/plugins/actions
@@ -41,7 +43,6 @@ $(KOLLA_ANSIBLE_CMDS): kolla-ansible/tools/kolla-ansible $(BIN)/kolla-ansible
 
 migrate migrate-osds: ceph-ansible/library/kolla_docker.py roles
 	$(CEPH_ANSIBLE_ENVS) $(BIN)/ansible-playbook -i inventory/ $@.yml
-
 
 install-dependencies: install-apt-packages $(VENV) install-pip-packages
 
