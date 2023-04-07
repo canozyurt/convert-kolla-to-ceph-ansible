@@ -5,6 +5,7 @@ osd_auto_discovery: true
 
 monitor_interface: "eth4"
 radosgw_interface: "eth4"
+radosgw_frontend_port: 6780
 
 container_package_name: "docker-ce"
 container_service_name: "docker"

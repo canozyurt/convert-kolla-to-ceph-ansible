@@ -1,0 +1,103 @@
+- name: gather facts
+  hosts: all
+  tasks:
+  - setup:
+
+- name: Keys
+  hosts: localhost
+  vars_files:
+  - /usr/local/share/kolla-ansible/ansible/roles/cinder/defaults/main.yml
+  - /usr/local/share/kolla-ansible/ansible/roles/glance/defaults/main.yml
+  - /usr/local/share/kolla-ansible/ansible/group_vars/all.yml
+  - /etc/kolla/globals.yml
+  tasks:
+  - name: create ceph initial directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: 0755
+    loop:
+      - "{{ node_custom_config }}/cinder"
+      - "{{ node_custom_config }}/cinder/cinder-volume"
+      - "{{ node_custom_config }}/cinder/cinder-backup"
+      - "{{ node_custom_config }}/glance"
+      - "{{ node_custom_config }}/nova"
+
+
+  - name: Pulling cephx keyring for cinder
+    become: true
+    kolla_ceph_keyring:
+      name: client.cinder
+      caps: "{{ ceph_client_cinder_keyring_caps }}"
+    register: cephx_key_cinder
+    delegate_to: "{{ groups['ceph-mon'][0] }}"
+    run_once: True
+
+  - name: Pulling cephx keyring for cinder-backup
+    become: true
+    kolla_ceph_keyring:
+      name: client.cinder-backup
+      caps: "{{ ceph_client_cinder_backup_keyring_caps }}"
+    register: cephx_key_cinder_backup
+    delegate_to: "{{ groups['ceph-mon'][0] }}"
+    run_once: True
+
+  - name: Pulling cephx keyring for glance
+    become: true
+    kolla_ceph_keyring:
+      name: client.glance
+      caps: "{{ ceph_client_glance_keyring_caps }}"
+    register: cephx_key
+    delegate_to: "{{ groups['ceph-mon'][0] }}"
+    run_once: True
+
+  - name: Pushing cinder cephx keyring
+    copy:
+      content: |
+        [client.{{ item.key_name }}]
+            key = {{ item.key }}
+      dest: "{{ node_custom_config }}/cinder/{{ item.service_name }}/ceph.client.{{ item.key_name }}.keyring"
+      mode: "0644"
+    with_items:
+      - { service_name: "cinder-volume", key_name: "cinder", key: "{{ cephx_key_cinder.keyring.key }}" }
+      - { service_name: "cinder-backup", key_name: "cinder", key: "{{ cephx_key_cinder.keyring.key }}" }
+      - { service_name: "cinder-backup", key_name: "cinder-backup", key: "{{ cephx_key_cinder_backup.keyring.key }}" }
+
+  - name: Pushing nova cephx keyring
+    copy:
+      content: |
+        [client.{{ item.key_name }}]
+            key = {{ item.key }}
+      dest: "{{ node_custom_config }}/{{ item.service_name }}/ceph.client.{{ item.key_name }}.keyring"
+      mode: "0644"
+    with_items:
+      - { service_name: "nova", key_name: "cinder", key: "{{ cephx_key_cinder.keyring.key }}" }
+      - { service_name: "nova", key_name: "nova", key: "{{ cephx_key_cinder.keyring.key }}" }
+
+  - name: Pushing glance cephx keyring
+    copy:
+      content: |
+        [client.glance]
+            key = {{ cephx_key.keyring.key }}
+      dest: "{{ node_custom_config }}/glance/ceph.client.glance.keyring"
+      mode: "0644"
+
+  post_tasks:
+
+  - import_role:
+      name: ceph-defaults
+
+  - import_role:
+      name: ceph-facts
+
+  - name: generate ceph configuration file
+    action: config_template
+    args:
+      src: "roles/ceph-config/templates/ceph.conf.j2"
+      dest: "{{ item }}"
+      config_overrides: "{{ ceph_conf_overrides }}"
+      config_type: ini
+    with_items:
+      - "{{ node_custom_config }}/{{ cluster_name }}.conf"
+      - "{{ node_custom_config }}/cinder/{{ cluster_name }}.conf"
+      - "{{ node_custom_config }}/nova/{{ cluster_name }}.conf"

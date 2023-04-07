@@ -1,13 +1,13 @@
 #https://github.com/ceph/ceph-ansible/blob/stable-4.0/profiles/rgw-keystone-v3
 ceph_conf_overrides:
-  "client.rgw.{{ hostvars[inventory_hostname]['ansible_facts']['hostname'] }}":
-    "rgw keystone api version": "3"
-    "rgw keystone url": "http://192.168.0.1:35357"
-    "rgw keystone admin token": "password"
-    "rgw keystone admin project": "admin"
-    "rgw keystone admin domain": "default"
-    "rgw keystone accepted roles": "Member, _member_, admin"
-    "rgw keystone token cache size": "10000"
-    "rgw keystone revocation interval": "900"
+   "client.rgw.{{ hostvars[inventory_hostname]['ansible_facts']['hostname'] }}.rgw0":
+    "rgw_keystone_url": "http://192.168.127.200:35357"
+    "rgw_keystone_admin_user": "ceph_rgw"
+    "rgw_keystone_admin_password": "RG3w7yIxjCxnaJJ31OfzpXM8O1OUHAyoKn9gEdSQ"
+    "rgw_keystone_admin_project": "service"
+    "rgw_keystone_admin_domain": "default"
+    "rgw_keystone_api_version": 3
+    "rgw_keystone_accepted_roles": "admin, _member_"
+    "rgw_keystone_accepted_admin_roles": "ResellerAdmin"
+    "rgw_swift_versioning_enabled": "true"
     "rgw s3 auth use keystone": "true"
-    "nss db path": "/var/lib/ceph/radosgw/ceph-radosgw.{{ ansible_facts['hostname'] }}/nss"
