@@ -13,6 +13,9 @@ These instructions assume that your ceph-ansible folder is already set up and yo
  # ansible-playbook migrate-osds.yml
 ```
 
+migrate.yml migrates mon,mgr,mds,nfs,rgw services respectively.
+migrate-osds.yml migrates osd services.
+
 ## Checklist
 
 * Make sure that current ceph version is Nautilus and you are using stable-4.0 branch for ceph-ansible.
@@ -26,7 +29,7 @@ These instructions assume that your ceph-ansible folder is already set up and yo
 * RGW ports may differ in both tools. If so, set rgw ports properly.
 * RGW Keystone integration is present in rgws.yml
 
-For example configuration, you can refer to [all.yml](/group_vars/all.yml) and [rgws.yml](/group_vars/rgws.yml.sample)
+For example configuration, you can refer to [all.yml](/group_vars/all.yml), [rgws.yml](/group_vars/rgws.yml.sample) and [inventory](/inventory/vagrant)
     
 ## Test Environment
 
