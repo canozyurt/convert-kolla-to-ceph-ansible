@@ -15,7 +15,8 @@ These instructions assume that your ceph-ansible folder is already set up and yo
 
 ## Checklist
 
-* Make sure your ceph-ansible clone is not suffering from [this issue](https://github.com/ceph/ceph-ansible/issues/7417) and nfs role works fine.
+* Make sure that current ceph version is Nautilus and you are using stable-4.0 branch for ceph-ansible.
+* Make sure that your ceph-ansible clone is not suffering from [this issue](https://github.com/ceph/ceph-ansible/issues/7417) and nfs role works fine.
 * Inventory and all.yml is configured and ceph-ansible can deploy a healthy cluster with correct NIC bindings and desired ceph.conf.
 * containerized_deployment in all.yml is set to true.
 * generated_fsid in all.yml is set to false
