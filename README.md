@@ -13,6 +13,19 @@ These instructions assume that your ceph-ansible folder is already set up and yo
  # ansible-playbook migrate-osds.yml
 ```
 
+OR
+
+
+```bash
+ # docker build -t migrate-ceph .
+ # docker run -it --rm --network host -e ANSIBLE_HOST_KEY_CHECKING=False \
+ #     -v $(PWD)/inventory:/app/ceph-ansible/inventory \
+ #     -v $(PWD)/group_vars:/app/ceph-ansible/group_vars \
+ #     -v $(HOME)/.ssh:/root/.ssh migrate-ceph
+ # ansible-playbook -i inventory migrate.yml
+ # ansible-playbook -i inventory migrate-osds.yml
+```
+
 migrate.yml migrates mon,mgr,mds,nfs,rgw services respectively.
 migrate-osds.yml migrates osd services.
 
